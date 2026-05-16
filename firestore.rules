@@ -1,0 +1,166 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myRole() {
+      return userDoc().role;
+    }
+
+    function myWorkspaceId() {
+      return userDoc().workspaceId;
+    }
+
+    function isOwner() {
+      return isSignedIn() && myRole() == 'owner';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && myRole() == 'admin';
+    }
+
+    function isOwnerOrAdmin() {
+      return isSignedIn() && (myRole() == 'owner' || myRole() == 'admin');
+    }
+
+    function isTeam() {
+      return isSignedIn() && myRole() == 'team';
+    }
+
+    function isClient() {
+      return isSignedIn() && myRole() == 'client';
+    }
+
+    function sameWs(wsId) {
+      return myWorkspaceId() == wsId;
+    }
+
+    function isVerified() {
+      return userDoc().invitationStatus == 'verified';
+    }
+
+    // ── Workspaces ────────────────────────────────────────────────────────────
+    match /workspaces/{wsId} {
+      // All verified members can read workspace branding
+      allow read: if isSignedIn() && sameWs(wsId) && isVerified();
+      // Only owner and admin can edit (logo, name)
+      allow write: if isOwnerOrAdmin() && sameWs(wsId);
+
+      // Audit logs — owner read-only
+      match /auditLogs/{logId} {
+        allow read: if isOwner() && sameWs(wsId);
+        allow create: if isOwnerOrAdmin() && sameWs(wsId);
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+    match /users/{uid} {
+      // Own doc or admin/owner in same workspace
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid ||
+        (isOwnerOrAdmin() && sameWs(resource.data.workspaceId))
+      );
+      // Created by Admin SDK (API route) — self-create on registration
+      allow create: if isSignedIn() && (
+        request.auth.uid == uid || isOwnerOrAdmin()
+      );
+      // Own doc updates; admin updates team/client only; owner updates all
+      allow update: if isSignedIn() && (
+        request.auth.uid == uid ||
+        isOwner() ||
+        (isAdmin() && resource.data.role != 'owner' && resource.data.role != 'admin')
+      );
+      // Only owner can delete anyone; admin can delete team/client only
+      allow delete: if (
+        (isOwner() && uid != request.auth.uid) ||
+        (isAdmin() && resource.data.role != 'owner' && resource.data.role != 'admin' && uid != request.auth.uid)
+      );
+    }
+
+    // ── Work Orders ───────────────────────────────────────────────────────────
+    match /workorders/{otId} {
+      // Owner/Admin: all; Team: all (filter to assigned tasks in client app);
+      // Client: own OTs only
+      allow read: if isSignedIn() && isVerified() && (
+        (isOwnerOrAdmin() && sameWs(resource.data.workspaceId)) ||
+        (isTeam() && sameWs(resource.data.workspaceId)) ||
+        (isClient() && resource.data.clientId == userDoc().clientId && sameWs(resource.data.workspaceId))
+      );
+      allow create: if isOwnerOrAdmin();
+      allow update: if isOwnerOrAdmin() || isTeam();
+      allow delete: if isOwner();
+
+      // Tasks sub-collection
+      match /tasks/{taskId} {
+        allow read: if isSignedIn() && isVerified() && sameWs(
+          get(/databases/$(database)/documents/workorders/$(otId)).data.workspaceId
+        );
+        allow create: if isOwnerOrAdmin();
+        allow update: if (
+          isOwnerOrAdmin() ||
+          isTeam() ||
+          // Client can only flip clientStatus field
+          (isClient() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clientStatus']))
+        );
+        allow delete: if isOwnerOrAdmin();
+
+        // Chat messages
+        match /messages/{msgId} {
+          allow read:   if isSignedIn() && isVerified();
+          allow create: if isSignedIn() && isVerified();
+          allow update, delete: if false;
+        }
+
+        // Documents
+        match /documents/{docId} {
+          allow read: if isSignedIn() && isVerified() && (
+            isOwnerOrAdmin() ||
+            isTeam() ||
+            (isClient() && (
+              !resource.data.requiresValidation ||
+              resource.data.status != 'rejected'
+            ))
+          );
+          allow create: if isOwnerOrAdmin() || isTeam();
+          allow update: if (
+            isOwnerOrAdmin() || isTeam() ||
+            (isClient() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+          );
+          allow delete: if isOwnerOrAdmin();
+        }
+      }
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      // Admin/Owner see workspace-wide notifs; Team sees only their own
+      allow read: if isSignedIn() && isVerified() && (
+        (isOwnerOrAdmin() && sameWs(resource.data.workspaceId)) ||
+        (isTeam() && resource.data.recipientUid == request.auth.uid)
+      );
+      allow create: if isSignedIn() && isVerified();
+      allow update: if isSignedIn() && sameWs(resource.data.workspaceId);
+      allow delete: if isOwnerOrAdmin();
+    }
+
+    // ── Meetings ──────────────────────────────────────────────────────────────
+    match /meetings/{meetingId} {
+      allow read: if isSignedIn() && isVerified() && (
+        (isOwnerOrAdmin() && sameWs(resource.data.workspaceId)) ||
+        (isClient() && resource.data.clientId == userDoc().clientId && sameWs(resource.data.workspaceId))
+      );
+      allow create, update, delete: if isOwnerOrAdmin();
+    }
+  }
+}

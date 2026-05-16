@@ -1,0 +1,31 @@
+# Compiled JavaScript files
+lib/
+dist/
+
+# TypeScript declaration files
+*.d.ts
+!src/*.d.ts
+
+# Node.js dependency directory
+node_modules/
+
+# Logs
+*-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env files
+.env
+.env.*
+*.local
+
+# Firebase
+.firebase/
+
+# Service accounts
+*-service-account.json
+service-account.json
+firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+clarity-ba6f4-firebase-adminsdk-fbsvc-c3b40689aa.json

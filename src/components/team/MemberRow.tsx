@@ -45,7 +45,7 @@ export default function MemberRow({ member, currentUid, canRemove, index, onRemo
       <div className="flex items-center gap-3 min-w-0">
         {/* Avatar */}
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-600/30 text-xs font-bold text-violet-300">
-          {(member.displayName ?? member.email)[0].toUpperCase()}
+          {(member.displayName || member.email || "?")[0]?.toUpperCase() ?? "?"}
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium text-white truncate">

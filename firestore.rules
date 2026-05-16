@@ -52,9 +52,17 @@ service cloud.firestore {
     // ── Workspaces ────────────────────────────────────────────────────────────
     match /workspaces/{wsId} {
       // All verified members can read workspace branding
-      allow read: if isSignedIn() && sameWs(wsId) && isVerified();
+      // Added wsId == request.auth.uid to prevent optimistic update race conditions
+      // where the frontend listener fires before the users doc is committed.
+      allow read: if isSignedIn() && (
+        wsId == request.auth.uid || 
+        (sameWs(wsId) && isVerified())
+      );
       // Only owner and admin can edit (logo, name)
-      allow write: if isOwnerOrAdmin() && sameWs(wsId);
+      allow write: if isSignedIn() && (
+        wsId == request.auth.uid || 
+        (isOwnerOrAdmin() && sameWs(wsId))
+      );
 
       // Audit logs — owner read-only
       match /auditLogs/{logId} {

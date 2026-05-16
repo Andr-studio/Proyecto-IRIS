@@ -27,7 +27,7 @@ const NAV = [
 ] as const;
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
-  const { profile, loading } = useWorkspace();
+  const { workspace, profile, loading } = useWorkspace();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -44,9 +44,16 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
   const Sidebar = (
     <aside className="flex h-full w-64 flex-col bg-[#0f0f1a] border-r border-white/8">
       <div className="px-5 py-6">
-        <p className="text-lg font-semibold text-white">
-          Clarity<span className="text-violet-400">Flow</span>
-        </p>
+        {workspace?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={workspace.logoUrl} alt={workspace.name || "Logo"} className="max-h-8 object-contain" />
+        ) : (
+          <p className="text-lg font-semibold text-white truncate">
+            {workspace?.name ? workspace.name : (
+              <>Clarity<span className="text-violet-400">Flow</span></>
+            )}
+          </p>
+        )}
       </div>
       <nav className="flex-1 space-y-1 px-3">
         {filteredNav.map(({ href, label, Icon }) => {

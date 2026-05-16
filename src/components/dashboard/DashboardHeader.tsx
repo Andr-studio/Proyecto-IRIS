@@ -204,15 +204,10 @@ export default function DashboardHeader({ onMenuClick, menuIcon }: Props) {
             {menuIcon}
           </button>
           <div className="flex items-center gap-2.5">
-            {workspace?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={workspace.logoUrl} alt="logo" className="h-7 w-7 rounded-lg object-cover ring-1 ring-white/10" />
-            ) : (
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600 text-xs font-bold text-white">
-                {workspace?.name?.[0]?.toUpperCase() ?? "C"}
-              </div>
-            )}
-            <span className="hidden text-sm font-semibold text-white sm:block">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-xs font-bold text-white">
+              {workspace?.name?.[0]?.toUpperCase() ?? "C"}
+            </div>
+            <span className="hidden text-sm font-semibold text-white sm:block truncate">
               {workspace?.name ?? "Clarity Flow"}
             </span>
           </div>
